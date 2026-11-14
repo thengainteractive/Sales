@@ -26,8 +26,10 @@ class OrderService implements OrderServiceInterface
         ?string $customerNotes = null,
         string $paymentMethod = 'cod'
     ): Order {
-        $addressData = \App\Core\HtmlSanitizer::cleanArray($addressData);
-        $customerNotes = $customerNotes ? \App\Core\HtmlSanitizer::clean($customerNotes) : null;
+        $addressData = array_map(function ($val) {
+            return is_string($val) ? trim(strip_tags($val)) : $val;
+        }, $addressData);
+        $customerNotes = $customerNotes ? trim(strip_tags($customerNotes)) : null;
 
         $order = DB::transaction(function () use ($items, $addressData, $customerNotes, $paymentMethod) {
             $validated = $this->validateCartItems($items);

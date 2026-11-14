@@ -55,7 +55,7 @@ class Order extends Model
                 'admin_notes',
             ] as $field) {
                 if (isset($order->attributes[$field]) && is_string($order->attributes[$field])) {
-                    $order->attributes[$field] = \App\Core\HtmlSanitizer::clean($order->attributes[$field]);
+                    $order->attributes[$field] = trim(strip_tags((string) $order->attributes[$field]));
                 }
             }
         });

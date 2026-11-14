@@ -41,7 +41,7 @@ class OrderAddress extends Model
                 'pincode',
             ] as $field) {
                 if (isset($address->attributes[$field]) && is_string($address->attributes[$field])) {
-                    $address->attributes[$field] = \App\Core\HtmlSanitizer::clean($address->attributes[$field]);
+                    $address->attributes[$field] = trim(strip_tags((string) $address->attributes[$field]));
                 }
             }
         });
