@@ -110,7 +110,33 @@ class OrderService implements OrderServiceInterface
         $subtotal = 0.00;
 
         foreach ($items as $rawItem) {
-            $productId = $rawItem['id'] ?? $rawItem['product_id'] ?? null;
+            // Resolve productId, variantId, and variantTitle from rawItem
+            $productId = $rawItem['product_id'] ?? $rawItem['productId'] ?? null;
+            $variantId = $rawItem['variant_id'] ?? $rawItem['variantId'] ?? ($rawItem['options']['variant_id'] ?? null);
+            $variantTitle = $rawItem['variant_title'] ?? $rawItem['variantTitle'] ?? ($rawItem['options']['variant_title'] ?? null);
+
+            $rawId = $rawItem['id'] ?? null;
+
+            if (! $productId && $rawId !== null) {
+                if (is_string($rawId) && str_contains($rawId, '_')) {
+                    $parts = explode('_', $rawId);
+                    $productId = is_numeric($parts[0]) ? (int) $parts[0] : $parts[0];
+                    if (! $variantId && isset($parts[1])) {
+                        $variantId = is_numeric($parts[1]) ? (int) $parts[1] : $parts[1];
+                    }
+                } elseif (is_numeric($rawId)) {
+                    $productId = (int) $rawId;
+                } else {
+                    $productId = $rawId;
+                }
+            } elseif (is_string($productId) && str_contains($productId, '_')) {
+                $parts = explode('_', $productId);
+                $productId = is_numeric($parts[0]) ? (int) $parts[0] : $parts[0];
+                if (! $variantId && isset($parts[1])) {
+                    $variantId = is_numeric($parts[1]) ? (int) $parts[1] : $parts[1];
+                }
+            }
+
             $quantity = max(1, (int) ($rawItem['quantity'] ?? 1));
 
             if ($catalogService && $catalogService->isAvailable()) {
@@ -121,7 +147,7 @@ class OrderService implements OrderServiceInterface
                 $product = $catalogService->findProduct($productId);
 
                 if (! $product) {
-                    $name = $rawItem['name'] ?? "ID: {$productId}";
+                    $name = $rawItem['name'] ?? $rawItem['product_name'] ?? "ID: {$productId}";
                     throw new \InvalidArgumentException("Product '{$name}' is not found in our catalog.");
                 }
 
@@ -129,21 +155,37 @@ class OrderService implements OrderServiceInterface
                     throw new \InvalidArgumentException("Product '{$product->name}' is currently unavailable.");
                 }
 
-                // Support variant price / title if variant_id provided
-                $variantId = $rawItem['variant_id'] ?? null;
+                // Support variant price / title if variant_id or variant_title provided
                 $variant = null;
                 if ($variantId && method_exists($product, 'variants')) {
-                    $variant = $product->variants->firstWhere('id', $variantId);
+                    $variant = $product->variants->firstWhere('id', '==', $variantId);
+                    if (! $variant && $variantTitle) {
+                        $variant = $product->variants->firstWhere('title', $variantTitle);
+                    }
+                } elseif ($variantTitle && method_exists($product, 'variants')) {
+                    $variant = $product->variants->firstWhere('title', $variantTitle);
                 }
 
                 if ($variant) {
-                    $unitPrice = (float) ($variant->sale_price ?? $variant->actual_price ?? 0);
-                    $productName = "{$product->name} - {$variant->title}";
+                    if (isset($variant->is_active) && ! $variant->is_active) {
+                        throw new \InvalidArgumentException("Variant '{$variant->title}' of '{$product->name}' is currently unavailable.");
+                    }
+
+                    $unitPrice = (float) (! empty($variant->sale_price) && (float) $variant->sale_price > 0
+                        ? $variant->sale_price
+                        : ($variant->actual_price ?? $product->sale_price ?? $product->actual_price ?? 0));
+
+                    $productName = "{$product->name} ({$variant->title})";
                     $sku = $variant->sku ?? $product->sku ?? null;
                     $image = $variant->image ?? $rawItem['image'] ?? null;
-                    $options = ['variant_id' => $variant->id, 'variant_title' => $variant->title];
+                    $options = [
+                        'variant_id' => $variant->id,
+                        'variant_title' => $variant->title,
+                    ];
                 } else {
-                    $unitPrice = (float) ($product->sale_price ?? $product->actual_price ?? 0);
+                    $unitPrice = (float) (! empty($product->sale_price) && (float) $product->sale_price > 0
+                        ? $product->sale_price
+                        : ($product->actual_price ?? 0));
                     $productName = $product->name;
                     $sku = $product->sku ?? null;
                     $image = $rawItem['image'] ?? null;
@@ -151,21 +193,25 @@ class OrderService implements OrderServiceInterface
                 }
             } else {
                 // Standalone fallback if catalog is not active
-                $unitPrice = (float) ($rawItem['price'] ?? 0);
-                $productName = (string) ($rawItem['name'] ?? 'Product');
+                $unitPrice = (float) ($rawItem['price'] ?? $rawItem['unit_price'] ?? 0);
+                $productName = (string) ($rawItem['name'] ?? $rawItem['product_name'] ?? 'Product');
                 $sku = $rawItem['sku'] ?? null;
                 $image = $rawItem['image'] ?? null;
-                $options = null;
+                $options = ! empty($variantId) ? ['variant_id' => $variantId] : null;
             }
 
             $lineTotal = round($unitPrice * $quantity, 2);
             $subtotal += $lineTotal;
 
             $validatedItems[] = [
-                'product_id' => $productId ? (int) $productId : null,
+                'id' => $rawItem['id'] ?? ($productId . ($variantId ? "_{$variantId}" : '')),
+                'product_id' => is_numeric($productId) ? (int) $productId : $productId,
+                'variant_id' => $variant ? $variant->id : ($variantId ? (is_numeric($variantId) ? (int) $variantId : $variantId) : null),
                 'product_name' => $productName,
+                'name' => $productName,
                 'sku' => $sku,
                 'unit_price' => $unitPrice,
+                'price' => $unitPrice,
                 'quantity' => $quantity,
                 'line_total' => $lineTotal,
                 'image' => $image,
