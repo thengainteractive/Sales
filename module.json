@@ -1,0 +1,14 @@
+{
+    "name": "Sales",
+    "alias": "sales",
+    "description": "Sales, order and checkout management module for FLX platform",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Sales\\Providers\\SalesServiceProvider"
+    ],
+    "files": [],
+    "filament": {
+        "plugin": "Modules\\Sales\\SalesPlugin"
+    }
+}
