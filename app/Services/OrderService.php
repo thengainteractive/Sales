@@ -6,6 +6,7 @@ namespace Modules\Sales\Services;
 
 use App\Core\ModuleRegistry;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Modules\Catalog\Contracts\CatalogServiceInterface;
 use Modules\Sales\Contracts\OrderServiceInterface;
 use Modules\Sales\Events\OrderPlaced;
@@ -177,7 +178,7 @@ class OrderService implements OrderServiceInterface
 
                     $productName = "{$product->name} ({$variant->title})";
                     $sku = $variant->sku ?? $product->sku ?? null;
-                    $image = $variant->image ?? $rawItem['image'] ?? null;
+                    $image = $this->resolveImageUrl($variant->image ?: ($rawItem['image'] ?? null));
                     $options = [
                         'variant_id' => $variant->id,
                         'variant_title' => $variant->title,
@@ -188,7 +189,7 @@ class OrderService implements OrderServiceInterface
                         : ($product->actual_price ?? 0));
                     $productName = $product->name;
                     $sku = $product->sku ?? null;
-                    $image = $rawItem['image'] ?? null;
+                    $image = $this->resolveImageUrl($rawItem['image'] ?? ($product->gallery_images[0] ?? null));
                     $options = null;
                 }
             } else {
@@ -196,7 +197,7 @@ class OrderService implements OrderServiceInterface
                 $unitPrice = (float) ($rawItem['price'] ?? $rawItem['unit_price'] ?? 0);
                 $productName = (string) ($rawItem['name'] ?? $rawItem['product_name'] ?? 'Product');
                 $sku = $rawItem['sku'] ?? null;
-                $image = $rawItem['image'] ?? null;
+                $image = $this->resolveImageUrl($rawItem['image'] ?? null);
                 $options = ! empty($variantId) ? ['variant_id' => $variantId] : null;
             }
 
@@ -256,6 +257,30 @@ class OrderService implements OrderServiceInterface
     public function getSettings(): OrderSetting
     {
         return OrderSetting::instance();
+    }
+
+    /**
+     * Resolve a relative media path or public storage path into a fully qualified web URI.
+     */
+    protected function resolveImageUrl(?string $image): ?string
+    {
+        if (empty($image)) {
+            return null;
+        }
+
+        if (str_starts_with($image, 'http://') || str_starts_with($image, 'https://') || str_starts_with($image, '//')) {
+            return $image;
+        }
+
+        if (str_starts_with($image, '/storage/')) {
+            return $image;
+        }
+
+        if (str_starts_with($image, 'storage/')) {
+            return '/' . $image;
+        }
+
+        return Storage::url($image);
     }
 }
 
