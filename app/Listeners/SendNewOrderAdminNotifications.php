@@ -36,10 +36,17 @@ class SendNewOrderAdminNotifications
             return;
         }
 
-        Notification::send($admins, new AdminNewOrderNotification($order));
+        try {
+            Notification::send($admins, new AdminNewOrderNotification($order));
 
-        foreach ($admins as $admin) {
-            DatabaseNotificationsSent::dispatch($admin);
+            foreach ($admins as $admin) {
+                DatabaseNotificationsSent::dispatch($admin);
+            }
+        } catch (\Throwable $e) {
+            Log::error("Failed to send admin order notification for order #{$order->order_number}: {$e->getMessage()}", [
+                'order_id' => $order->id,
+                'exception' => $e,
+            ]);
         }
     }
 
