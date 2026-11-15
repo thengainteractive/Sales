@@ -30,7 +30,7 @@ class ManageOrderSettings extends Page
         /** @var \App\Models\User|null $user */
         $user = auth()->user();
 
-        return $user && ($user->hasRole('Super Admin') || $user->hasPermissionTo('manage_order_settings') || $user->hasPermissionTo('view_orders'));
+        return $user && ($user->hasRole('Super Admin') || $user->can('manage_order_settings') || $user->can('view_orders'));
     }
 
     /**

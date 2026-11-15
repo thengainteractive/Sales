@@ -11,26 +11,26 @@ class OrderPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->hasRole('Super Admin') || $user->hasPermissionTo('view_orders');
+        return $user->hasRole('Super Admin') || $user->can('view_orders');
     }
 
     public function view(User $user, Order $order): bool
     {
-        return $user->hasRole('Super Admin') || $user->hasPermissionTo('view_orders');
+        return $user->hasRole('Super Admin') || $user->can('view_orders');
     }
 
     public function create(User $user): bool
     {
-        return $user->hasRole('Super Admin') || $user->hasPermissionTo('create_orders');
+        return $user->hasRole('Super Admin') || $user->can('create_orders');
     }
 
     public function update(User $user, Order $order): bool
     {
-        return $user->hasRole('Super Admin') || $user->hasPermissionTo('edit_orders');
+        return $user->hasRole('Super Admin') || $user->can('edit_orders');
     }
 
     public function delete(User $user, Order $order): bool
     {
-        return $user->hasRole('Super Admin') || $user->hasPermissionTo('delete_orders');
+        return $user->hasRole('Super Admin') || $user->can('delete_orders');
     }
 }
